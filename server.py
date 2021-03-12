@@ -88,8 +88,7 @@ def register(id):
 @app.route("/listen/<id>", methods=['GET'])
 def listen(id):
     data = listeners[id]
-    listeners[id] = dict()
-    print(listeners)
+    listeners[id] = myWorld.world()
     return data
 
 @app.route("/entity/<entity>", methods=['POST','PUT'])
@@ -110,7 +109,6 @@ def batch_update():
     for listener in listeners.values():
         listener.update(entities)
     myWorld.update(entities)
-    print(listeners)
     return "", 200
 
 @app.route("/entity/<entity>")    

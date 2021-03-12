@@ -24,6 +24,7 @@
   </head> 
   <body bgcolor="black" height="100%" width="100%"> 
     <canvas id="c" width="100%" height="100%" style="-webkit-tap-highlight-color: transparent;"></canvas> 
+    <button onclick="sendClear()">Clear</button>
     <script>
 var canvas = document.getElementById('c');
 var host = window.location.host;
@@ -31,31 +32,8 @@ var context = canvas.getContext("2d");
 var W = canvas.width  = window.innerWidth-6;
 var H = canvas.height = window.innerHeight-50;
 
+var world = {};
 
-function sendJSONXMLHTTPRequest(url, objects, callback) {
-    var xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = function () {
-        if (xhr.readyState==4) {
-            try {
-                if (xhr.status==200) {
-                    //XXX: parse some JSON from the request!
-                    //XXX: Pass the data to the callback!
-                }
-            } 
-            catch(e) {
-                alert('Error: ' + e.name);
-            }
-        }
-    };
-    //XXX: POST to a URL
-    //XXX: set the mimetype and the accept headers!
-    // Remember to use application/json !
-}
-
-
-world = {};
-
-//XXX: TODO Make this prettier!
 function drawCircle(context,entity) {
     with(context) {
         beginPath();              
@@ -147,15 +125,19 @@ async function sendNewEntities(data) {
 
 function addEntity(entity, data) {
     world[entity] = data;
-    newEntities[entity] = data;
+    newEntities[entity] = data; // Store new entities in a batch
     drawNextFrame(); // (but should we?)    
 }
 
 var counter = 0;
 function addEntityWithoutName(data) {
     // var name = "X"+Math.floor((Math.random()*100000)+1);
-    var name = `${localID}x${(counter++)%100}`; // 100 circles per client
+    var name = `${localID}x${(counter++)}`; 
     addEntity(name,data);
+}
+
+function sendClear() {
+    fetch('/clear')
 }
 
 // canvas + mouse/touch is complicated 
@@ -257,26 +239,29 @@ mouse = (function() {
 // Add the application specific mouse listeners!
 //XXX: TODO Make these prettier!
 mouse.mousedowners.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'blue'});
-    clearInterval(serverUpdateInterval) // Pause server updates while mouse is down
+    addEntityWithoutName({'x':x,'y':y,'colour':'white','radius':2});
 });
 
 mouse.mouseuppers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'red'});
-    sendNewEntities(JSON.stringify(newEntities))
-    newEntities = {}
-    serverUpdateInterval = setInterval(serverUpdate, 1000/10.0); // Resume server updates when mouse has lifted
+    addEntityWithoutName({'x':x,'y':y,'colour':'white','radius':2});
 });
 
 mouse.mousedraggers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'green',
-                          'radius':10});
+    addEntityWithoutName({'x':x,'y':y,'colour':'white','radius':2});
 });
 
 
 
 function serverUpdate() {
     //XXX: TODO Get the world from the webservice using a XMLHTTPRequest
+
+    // If there are new entities to be sent, send the batch and reset newEntities
+    // https://stackoverflow.com/a/6700
+    if (Object.keys(newEntities).length > 0) {
+        sendNewEntities(JSON.stringify(newEntities))
+        newEntities = {}
+    }
+    
 
     fetch(`/listen/${ localID }`).then((response) => {
         if (response.status === 200) {
@@ -286,11 +271,14 @@ function serverUpdate() {
         }
     }).then((json) => {
         if ('clear' in json) {
+            console.log("got clear")
             world = {};
-            delete json.clear
+            delete json.clear;
+        } else {
+            Object.assign(world, json);
+            drawNextFrame();
         }
-        Object.assign(world, json)
-        drawNextFrame();
+        
     });    
 }
 
@@ -303,9 +291,8 @@ var localID
 var serverUpdateInterval
 var localID = Math.floor((Math.random()*1000000000))
 fetch(`/register/${ localID }`).then((r) => {
-    // 30 frames per second
-    setInterval(renderUpdate, 1000/30.0);
-    serverUpdateInterval = setInterval(serverUpdate, 100) // 100ms
+    setInterval(renderUpdate, 1000/60.0); // 30 frames per second
+    serverUpdateInterval = setInterval(serverUpdate, 100) // Server updates every 100 ms
 });
 
     </script>
