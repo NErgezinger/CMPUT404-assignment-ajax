@@ -121,7 +121,7 @@ def clear():
     myWorld.clear()
     for listener in listeners.values():
         listener['clear'] = 'clear'
-    return "", 200
+    return {}
 
 if __name__ == "__main__":
     app.run()
