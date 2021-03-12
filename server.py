@@ -61,6 +61,7 @@ class World:
 # curl -v   -H "Content-Type: application/json" -X PUT http://127.0.0.1:5000/entity/X -d '{"x":1,"y":1}' 
 
 myWorld = World()
+listeners = dict()
 
 
 
@@ -123,5 +124,4 @@ def clear():
     return "", 200
 
 if __name__ == "__main__":
-    listeners = {}
     app.run()
