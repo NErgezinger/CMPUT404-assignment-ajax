@@ -133,18 +133,28 @@ function getPosition(e) {
 	}
 }
 
+var newEntities = {}
+
+async function sendNewEntities(data) {
+    fetch('/update', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: data
+    });
+}
 
 function addEntity(entity, data) {
     world[entity] = data;
-    drawNextFrame(); // (but should we?)
-    //XXX: Send a XHTML Request that updates the entity you just  modified!
-
+    newEntities[entity] = data;
+    drawNextFrame(); // (but should we?)    
 }
 
 var counter = 0;
 function addEntityWithoutName(data) {
-    //var name = "X"+Math.floor((Math.random()*100)+1);
-    var name = "X"+(counter++)%100;
+    // var name = "X"+Math.floor((Math.random()*100000)+1);
+    var name = `${localID}x${(counter++)%100}`; // 100 circles per client
     addEntity(name,data);
 }
 
@@ -248,10 +258,14 @@ mouse = (function() {
 //XXX: TODO Make these prettier!
 mouse.mousedowners.push(function(x,y,clicked,e) {
     addEntityWithoutName({'x':x,'y':y,'colour':'blue'});
+    clearInterval(serverUpdateInterval) // Pause server updates while mouse is down
 });
 
 mouse.mouseuppers.push(function(x,y,clicked,e) {
     addEntityWithoutName({'x':x,'y':y,'colour':'red'});
+    sendNewEntities(JSON.stringify(newEntities))
+    newEntities = {}
+    serverUpdateInterval = setInterval(serverUpdate, 1000/10.0); // Resume server updates when mouse has lifted
 });
 
 mouse.mousedraggers.push(function(x,y,clicked,e) {
@@ -260,15 +274,39 @@ mouse.mousedraggers.push(function(x,y,clicked,e) {
 });
 
 
-function update() {
+
+function serverUpdate() {
     //XXX: TODO Get the world from the webservice using a XMLHTTPRequest
+
+    fetch(`/listen/${ localID }`).then((response) => {
+        if (response.status === 200) {
+            return response.json();
+        } else {
+            console.log(error);
+        }
+    }).then((json) => {
+        if ('clear' in json) {
+            world = {};
+            delete json.clear
+        }
+        Object.assign(world, json)
+        drawNextFrame();
+    });    
+}
+
+function renderUpdate() {
     drawFrame();
 }
 
-// 30 frames per second
-setInterval( update, 1000/30.0);
 
-
+var localID
+var serverUpdateInterval
+var localID = Math.floor((Math.random()*1000000000))
+fetch(`/register/${ localID }`).then((r) => {
+    // 30 frames per second
+    setInterval(renderUpdate, 1000/30.0);
+    serverUpdateInterval = setInterval(serverUpdate, 100) // 100ms
+});
 
     </script>
 </body>

@@ -22,7 +22,7 @@
 
 
 import flask
-from flask import Flask, request
+from flask import Flask, request, redirect
 import json
 app = Flask(__name__)
 app.debug = True
@@ -45,6 +45,9 @@ class World:
     def set(self, entity, data):
         self.space[entity] = data
 
+    def update(self, data):
+        self.space.update(data)
+
     def clear(self):
         self.space = dict()
 
@@ -57,7 +60,9 @@ class World:
 # you can test your webservice from the commandline
 # curl -v   -H "Content-Type: application/json" -X PUT http://127.0.0.1:5000/entity/X -d '{"x":1,"y":1}' 
 
-myWorld = World()          
+myWorld = World()
+
+
 
 # I give this to you, this is how you get the raw body/data portion of a post in flask
 # this should come with flask but whatever, it's not my project.
@@ -73,28 +78,52 @@ def flask_post_json():
 
 @app.route("/")
 def hello():
-    '''Return something coherent here.. perhaps redirect to /static/index.html '''
-    return None
+    return redirect("/static/index.html")
+
+@app.route("/register/<id>", methods=['GET'])
+def register(id):
+    listeners[id] = dict()
+    return "", 200
+
+@app.route("/listen/<id>", methods=['GET'])
+def listen(id):
+    data = listeners[id]
+    listeners[id] = dict()
+    print(listeners)
+    return data
 
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
-    '''update the entities via this interface'''
-    return None
+    data = flask_post_json()
+    for listener in listeners.values():
+        listener[entity] = data
+    myWorld.set(entity, data)
+    return data
 
-@app.route("/world", methods=['POST','GET'])    
+@app.route("/world", methods=['POST','GET'])
 def world():
-    '''you should probably return the world here'''
-    return None
+    return myWorld.world()
+
+@app.route("/update", methods=['POST', 'PUT'])
+def batch_update():
+    entities = flask_post_json()
+    for listener in listeners.values():
+        listener.update(entities)
+    myWorld.update(entities)
+    print(listeners)
+    return "", 200
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
-    '''This is the GET version of the entity interface, return a representation of the entity'''
-    return None
+    return myWorld.get(entity)
 
 @app.route("/clear", methods=['POST','GET'])
 def clear():
-    '''Clear the world out!'''
-    return None
+    myWorld.clear()
+    for listener in listeners.values():
+        listener['clear'] = 'clear'
+    return "", 200
 
 if __name__ == "__main__":
+    listeners = {}
     app.run()
